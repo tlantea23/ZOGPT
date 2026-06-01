@@ -2,44 +2,67 @@
 import { useState } from 'react';
 
 export default function Home() {
-  const [input, setInput] = useState('');
   const [messages, setMessages] = useState<{role: string, content: string}[]>([]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const sendMessage = async () => {
-    if (!input) return;
-    const newMessages = [...messages, {role: 'user', content: input}];
-    setMessages(newMessages);
+    if (!input.trim() || loading) return;
+
+    const userMessage = input;
+    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
     setInput('');
+    setLoading(true);
+
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: userMessage })
+      });
+
+      const data = await response.json();
+      setMessages(prev => [...prev, { role: 'bot', content: data.reply || data.error }]);
+
+    } catch (error) {
+      setMessages(prev => [...prev, { role: 'bot', content: 'Network a buai, vawi khat han try leh teh' }]);
+    }
     
-    // API call kan la dah ang
-    setTimeout(() => {
-      setMessages([...newMessages, {role: 'assistant', content: 'ZOGPT test reply: ' + input}]);
-    }, 500);
-  }
+    setLoading(false);
+  };
 
   return (
-    <main className="flex min-h-screen flex-col items-center bg-gray-900 text-white p-4">
-      <h1 className="text-4xl font-bold my-8">ZOGPT</h1>
+    <main style={{ background: '#0f172a', color: 'white', minHeight: '100vh', padding: '20px', fontFamily: 'Arial' }}>
+      <h1 style={{ textAlign: 'center', color: '#fbbf24' }}>ZOGPT</h1>
       
-      <div className="w-full max-w-2xl flex-1 overflow-y-auto mb-4 space-y-4">
-        {messages.map((m, i) => (
-          <div key={i} className={`p-4 rounded-lg ${m.role === 'user' ? 'bg-blue-600 ml-auto' : 'bg-gray-700'} max-w-[80%]`}>
-            {m.content}
+      <div style={{ maxWidth: '600px', margin: '20px auto', height: '70vh', overflowY: 'auto', padding: '10px' }}>
+        {messages.map((msg, i) => (
+          <div key={i} style={{
+            background: msg.role === 'user' ? '#2563eb' : '#374151',
+            padding: '10px 15px',
+            borderRadius: '10px',
+            margin: msg.role === 'user' ? '10px 0 10px auto' : '10px auto 10px 0',
+            width: 'fit-content',
+            maxWidth: '80%'
+          }}>
+            {msg.content}
           </div>
         ))}
+        {loading && <div style={{ background: '#374151', padding: '10px 15px', borderRadius: '10px', width: 'fit-content' }}>Ngaihtuah mek...</div>}
       </div>
 
-      <div className="w-full max-w-2xl flex gap-2">
-        <input 
+      <div style={{ maxWidth: '600px', margin: '0 auto', display: 'flex', gap: '10px' }}>
+        <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-          className="flex-1 p-3 rounded-lg bg-gray-800 border border-gray-600"
           placeholder="ZOGPT hnenah engkim zawt rawh..."
+          style={{ flex: 1, padding: '12px', borderRadius: '8px', border: 'none', background: '#1f2937', color: 'white' }}
         />
         <button 
-          onClick={sendMessage}
-          className="px-6 py-3 bg-blue-600 rounded-lg font-bold hover:bg-blue-700"
+          onClick={sendMessage} 
+          disabled={loading}
+          style={{ padding: '12px 20px', borderRadius: '8px', border: 'none', background: loading ? '#4b5563' : '#2563eb', color: 'white', cursor: 'pointer' }}
         >
           Send
         </button>
