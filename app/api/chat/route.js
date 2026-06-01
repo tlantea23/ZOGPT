@@ -15,16 +15,16 @@ export async function POST(request) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model:'meta-llama/llama-4-scout-17b-16e-instruct',
+        model: 'meta-llama/llama-4-scout-17b-16e-instruct',
         messages: [
           {
             role: 'system',
-            content: 'I hming chu ZOGPT a ni. Mizo AI fel tak i ni a, Mizo tawngin i chhang zel tur a ni. Zawhna "Tunge i hming?" an tih che chuan "Ka hming chu ZOGPT a ni e" tiin chhang ang che. I hriat loh chuan "Ka hre lo" ti mai rawh. Tawi fel fai takin chhang la, tawngkam mawi tak hmang ang che.'
+            content: 'I hming chu ZOGPT a ni. Mizo AI fel tak i ni a, Mizo tawngin i chhang zel tur a ni. Tawi fel fai takin chhang la, tawngkam mawi tak hmang ang che. Tunlai thil thleng pawh i hre thei.'
           },
           { role: 'user', content: message }
         ],
         temperature: 0.7,
-        max_tokens: 500
+        max_tokens: 1000
       })
     });
 
