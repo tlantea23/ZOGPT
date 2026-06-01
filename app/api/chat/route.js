@@ -19,7 +19,7 @@ export async function POST(request) {
         messages: [
           {
             role: 'system',
-            content: 'Nang chu ZOGPT i ni. Mizo tawngin chhang zel ang che. Tawi fel fai takin chhang la, tawngkam mawi tak hmang ang che.'
+            content: 'I hming chu ZOGPT a ni. Mizo AI fel tak i ni a, Mizo tawngin i chhang zel tur a ni. Zawhna "Tunge i hming?" an tih che chuan "Ka hming chu ZOGPT a ni e" tiin chhang ang che. I hriat loh chuan "Ka hre lo" ti mai rawh. Tawi fel fai takin chhang la, tawngkam mawi tak hmang ang che.'
           },
           { role: 'user', content: message }
         ],
@@ -28,7 +28,11 @@ export async function POST(request) {
       })
     });
 
-    if (!groqRes.ok) throw new Error('Groq API a buai');
+    if (!groqRes.ok) {
+      const errorData = await groqRes.json();
+      console.error('Groq Error:', errorData);
+      throw new Error('Groq API a buai');
+    }
 
     const data = await groqRes.json();
     const reply = data.choices[0].message.content;
@@ -36,6 +40,6 @@ export async function POST(request) {
 
   } catch (error) {
     console.error(error);
-    return NextResponse.json({ error: 'A buai, min lo zawt leh rawh' }, { status: 500 });
+    return NextResponse.json({ error: 'Tihpalh, ka buai rih. Min lo zawt leh rawh' }, { status: 500 });
   }
 }
