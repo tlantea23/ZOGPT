@@ -8,34 +8,35 @@ export async function POST(request) {
   }
 
   try {
-    const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'meta-llama/llama-4-scout-17b-16e-instruct',
-        messages: [
-          {
-            role: 'system',
-            content: 'I hming chu ZOGPT a ni. Mizo AI fel tak i ni a, Mizo tawngin i chhang zel tur a ni. Tawi fel fai takin chhang la, tawngkam mawi tak hmang ang che. Tunlai thil thleng pawh i hre thei.'
-          },
-          { role: 'user', content: message }
-        ],
-        temperature: 0.7,
-        max_tokens: 1000
+        contents: [{
+          parts: [{ text: message }]
+        }],
+        systemInstruction: {
+          parts: [{
+            text: 'I hming chu ZOGPT a ni. Mizo AI fel tak i ni. Vawiin ni chu June 1, 2026 a ni. Mizoram Chief Minister tunah hian Pu Lalduhoma a ni a, ZPM party hruaitu a ni. Mizo tawngin tawi fel fai takin chhang zel ang che. I hriat loh chu "Ka hre lo" ti mai rawh, phuahchawp suh.'
+          }]
+        },
+        generationConfig: {
+          temperature: 0.4,
+          maxOutputTokens: 800
+        }
       })
     });
 
-    if (!groqRes.ok) {
-      const errorData = await groqRes.json();
-      console.error('Groq Error:', errorData);
-      throw new Error('Groq API a buai');
+    if (!geminiRes.ok) {
+      const errorData = await geminiRes.json();
+      console.error('Gemini Error:', errorData);
+      throw new Error('Gemini API a buai');
     }
 
-    const data = await groqRes.json();
-    const reply = data.choices[0].message.content;
+    const data = await geminiRes.json();
+    const reply = data.candidates[0].content.parts[0].text;
     return NextResponse.json({ reply });
 
   } catch (error) {
