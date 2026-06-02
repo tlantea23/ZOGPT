@@ -3,50 +3,51 @@ import { NextResponse } from "next/server";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-async function tryModel(modelName, contents) {
-  const model = genAI.getGenerativeModel({
-    model: modelName,
-    tools: [{ googleSearch: {} }],
-    systemInstruction: "I hming chu ZOGPT i ni. Mizo tawngin chhang zel ang che. Thlalak an rawn thawn che chuan chiang takin sawifiah ang che. News thar zawh che chuan Google Search hmangin zawng la, date nen chhang ang che."
-  });
-  const result = await model.generateContent(contents);
-  return result.response.text();
-}
-
 export async function POST(req) {
   try {
-    const { message, image } = await req.json();
+    const { message, image, history } = await req.json();
 
-    if (!message &&!image) {
-      return NextResponse.json({ error: "Message emaw thlalak a awm lo" }, { status: 400 });
+    const model = genAI.getGenerativeModel({
+      model: "gemini-2.5-flash",
+      systemInstruction: "I hming chu ZOGPT i ni. Mizo tawngin i chhang thin ang. I thian kawm ang takin, a tawi fel zawngin chhang rawh. I hma a inbiakna kha hre reng la, zawhna an zawt che a nih chuan chhanna nen chhunzawm zel ang che.",
+      tools: [{ googleSearch: {} }],
+    });
+
+    let contents = [];
+    
+    // 1. History a awm chuan telh hmasa rawh
+    if (history && history.length > 0) {
+      contents = [...history];
     }
 
-    // Thlalak leh thu kha Gemini format ah siam
-    const parts = [];
-    if (message) parts.push({ text: message });
+    // 2. Tun a user message/image thar belh rawh
+    let currentUserParts = [];
+    if (message) {
+      currentUserParts.push({ text: message });
+    }
     if (image) {
-      parts.push({
+      currentUserParts.push({
         inlineData: {
           mimeType: "image/jpeg",
-          data: image // base64 data
+          data: image
         }
       });
     }
+    contents.push({ role: "user", parts: currentUserParts });
 
-    let text;
-    try {
-      text = await tryModel("gemini-2.5-flash", parts);
-    } catch (err) {
-      console.log("2.5-flash a buai, 1.5-flash ka try:", err.message);
-      text = await tryModel("gemini-1.5-flash", parts);
-    }
+    const result = await model.generateContent({
+      contents: contents,
+    });
+
+    const response = await result.response;
+    const text = response.text();
 
     return NextResponse.json({ reply: text });
 
   } catch (error) {
-    console.error("Gemini Error:", error);
+    console.error("ZOGPT Error:", error);
     return NextResponse.json({
-      error: "Ka tihpalh, thlalak ka chhiar thei lo. Vawi khat han try leh teh."
+      error: "Ka tihpalh, ka buai deuh. Vawi khat han try leh teh."
     }, { status: 500 });
   }
 }
