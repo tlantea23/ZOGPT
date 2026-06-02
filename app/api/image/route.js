@@ -8,24 +8,19 @@ export async function POST(req) {
       return NextResponse.json({ error: "Prompt a awm lo" }, { status: 400 });
     }
 
-    // Google Imagen 3 API call
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${process.env.GEMINI_API_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        instances: [{ prompt: `high quality, 4k, detailed photo of: ${prompt}` }],
-        parameters: { sampleCount: 1 }
-      })
-    });
-
-    const data = await response.json();
-
-    if (!response.ok ||!data.predictions ||!data.predictions[0].bytesBase64Encoded) {
-      console.error("Imagen API Error:", data);
-      return NextResponse.json({ error: "Thlalak ka siam thei lo. Prompt dang han try teh." }, { status: 500 });
+    // Pollinations.ai - Free, API Key ngai lo, a thawk nghal
+    const encodedPrompt = encodeURIComponent(`${prompt}, high quality, 4k, detailed, mizo style`);
+    const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}`;
+    
+    // Image hi download la, base64 ah convert ang
+    const imageResponse = await fetch(imageUrl);
+    
+    if (!imageResponse.ok) {
+      throw new Error('Pollinations API a fail');
     }
 
-    const base64Image = `data:image/png;base64,${data.predictions[0].bytesBase64Encoded}`;
+    const imageBuffer = await imageResponse.arrayBuffer();
+    const base64Image = `data:image/jpeg;base64,${Buffer.from(imageBuffer).toString('base64')}`;
 
     return NextResponse.json({ image: base64Image });
 
