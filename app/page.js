@@ -1,7 +1,9 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
+import { signIn, signOut, useSession } from "next-auth/react";
 
 export default function Home() {
+  const { data: session, status } = useSession();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -176,15 +178,53 @@ export default function Home() {
     setLoading(false);
   };
 
+  // LOGIN A NGAI
+  if (status === "loading") {
+    return <div style={{background: '#0f172a', color: 'white', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>Loading...</div>
+  }
+
+  if (!session) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#0f172a',
+        color: 'white'
+      }}>
+        <h1 style={{ fontSize: '3rem', fontWeight: 'bold', marginBottom: '2rem', color: '#fbbf24' }}>
+          ZOGPT
+        </h1>
+        <button 
+          onClick={() => signIn('google')}
+          style={{
+            backgroundColor: '#2563eb',
+            padding: '12px 32px',
+            borderRadius: '8px',
+            fontSize: '1.1rem',
+            border: 'none',
+            color: 'white',
+            cursor: 'pointer'
+          }}
+        >
+          Google hmangin Lut rawh
+        </button>
+      </div>
+    )
+  }
+
+  // LOGIN A NIH CHUAN I CHAT APP KHA
   return (
     <>
       <style jsx>{`
         @keyframes pulse {
-          0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+          0% { box-shadow: 0 0 rgba(239, 68, 68, 0.7); }
           70% { box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); }
           100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
         }
-       .mic-btn {
+      .mic-btn {
           width: 48px;
           height: 48px;
           border-radius: 50%;
@@ -197,26 +237,34 @@ export default function Home() {
           background: #1f2937;
           color: white;
         }
-       .mic-btn:hover {
+      .mic-btn:hover {
           background: #374151;
         }
-       .mic-btn.listening {
+      .mic-btn.listening {
           background: #ef4444;
           animation: pulse 1.5s infinite;
         }
-       .mic-icon {
+      .mic-icon {
           width: 20px;
           height: 20px;
         }
       `}</style>
 
       <main style={{ background: '#0f172a', color: 'white', minHeight: '100vh', padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-        <h1 style={{ textAlign: 'center', color: '#fbbf24', marginBottom: '20px' }}>ZOGPT</h1>
+        <div style={{ maxWidth: '600px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <h1 style={{ color: '#fbbf24', margin: 0 }}>ZOGPT</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <img src={session.user?.image || ''} alt="Profile" style={{ width: '32px', height: '32px', borderRadius: '50%' }} />
+            <button onClick={() => signOut()} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: '#dc2626', color: 'white', cursor: 'pointer', fontSize: '12px' }}>
+              Logout
+            </button>
+          </div>
+        </div>
 
         <div style={{ maxWidth: '600px', margin: '0 auto', height: '60vh', overflowY: 'auto', padding: '10px', marginBottom: '20px' }}>
           {messages.length === 0 && (
             <div style={{ textAlign: 'center', color: '#9ca3af', marginTop: '50px' }}>
-              ZOGPT ka ni e. Mic hmet la, min be rawh.
+              ZOGPT ka ni e {session.user?.name}. Mic hmet la, min be rawh.
             </div>
           )}
           {messages.map((msg, i) => (
@@ -262,7 +310,6 @@ export default function Home() {
             📷
           </button>
 
-          {/* CHATGPT STYLE MIC BUTTON */}
           <button onClick={toggleListening} className={`mic-btn ${isListening? 'listening' : ''}`}>
             <svg className="mic-icon" fill="currentColor" viewBox="0 0 24 24">
               <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 0-.9.36-.98.85C16.52 14.2 14.47 16 12 16s-4.52-1.8-4.93-4.15c-.08-.49-.49-.85-.98-.85-.61 0-1.09.54-1 1.14.49 3 2.89 5.35 5.91 5.78V20c0.55.45 1 1 1s1-.45 1-1v-2.08c3.02-.43 5.42-2.78 5.91-5.78.1-.6-.39-1.14-1-1.14z"/>
