@@ -1,5 +1,5 @@
 'use client';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 export default function Home() {
   const [messages, setMessages] = useState([]);
@@ -7,8 +7,74 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [image, setImage] = useState(null);
   const [showCamera, setShowCamera] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const recognitionRef = useRef(null);
+
+  // Voice: Browser support check
+  useEffect(() => {
+    if (typeof window!== 'undefined') {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        recognitionRef.current = new SpeechRecognition();
+        recognitionRef.current.continuous = false;
+        recognitionRef.current.lang = 'en-US'; // Mizo a support lo, English in sawi la
+        recognitionRef.current.interimResults = false;
+
+        recognitionRef.current.onresult = (event) => {
+          const transcript = event.results[0][0].transcript;
+          setInput(transcript);
+          setIsListening(false);
+        };
+
+        recognitionRef.current.onerror = () => {
+          setIsListening(false);
+          alert('I aw ka hre thei lo. Mic i on em?');
+        };
+
+        recognitionRef.current.onend = () => {
+          setIsListening(false);
+        };
+      }
+    }
+  }, []);
+
+  // Voice: Mic On/Off
+  const toggleListening = () => {
+    if (!recognitionRef.current) {
+      alert('I browser hian Voice a support lo. Chrome hmang rawh');
+      return;
+    }
+    if (isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    } else {
+      setInput('');
+      recognitionRef.current.start();
+      setIsListening(true);
+    }
+  };
+
+  // Voice: ZOGPT tawng tir
+  const speak = (text) => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel(); // A hmasa stop phawt
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'en-US'; // Mizo a la tawng thei lo
+      utterance.rate = 1;
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => setIsSpeaking(false);
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
+  // Voice: Tawng lai stop
+  const stopSpeaking = () => {
+    window.speechSynthesis.cancel();
+    setIsSpeaking(false);
+  };
 
   // 1. File Upload
   const handleImage = (e) => {
@@ -63,9 +129,9 @@ export default function Home() {
     setInput('');
     setLoading(true);
     stopCamera();
+    stopSpeaking(); // Tawng lai a awm chuan ti tawp rawh
 
     try {
-      // THLALAK SIAM DUH EM? check phawt ang
       const isImageGen = userMessage.toLowerCase().includes("siam rawh") ||
                          userMessage.toLowerCase().includes("draw") ||
                          userMessage.toLowerCase().includes("thlalak min") ||
@@ -74,8 +140,9 @@ export default function Home() {
                          userMessage.toLowerCase().includes("siam teh");
 
       let response;
+      let botReply = '';
+
       if (isImageGen &&!image) {
-        // Image siamna API ko rawh
         response = await fetch('/api/image', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -83,12 +150,15 @@ export default function Home() {
         });
         const data = await response.json();
         if (data.image) {
-          setMessages(prev => [...prev, { role: 'bot', content: 'Awle, hei i thlalak tur:', image: data.image }]);
+          botReply = 'Awle, hei i thlalak tur:';
+          setMessages(prev => [...prev, { role: 'bot', content: botReply, image: data.image }]);
+          speak(botReply);
         } else {
-          setMessages(prev => [...prev, { role: 'bot', content: data.error || 'Thlalak ka siam thei lo' }]);
+          botReply = data.error || 'Thlalak ka siam thei lo';
+          setMessages(prev => [...prev, { role: 'bot', content: botReply }]);
+          speak(botReply);
         }
       } else {
-        // Chat pangngai + Vision + Memory
         const chatHistory = messages.map(msg => ({
           role: msg.role === 'bot'? 'model' : 'user',
           parts: [{ text: msg.content }]
@@ -104,13 +174,17 @@ export default function Home() {
           })
         });
         const data = await response.json();
-        setMessages(prev => [...prev, { role: 'bot', content: data.reply || data.error }]);
+        botReply = data.reply || data.error;
+        setMessages(prev => [...prev, { role: 'bot', content: botReply }]);
+        speak(botReply); // ZOGPT tawng tir nghal
       }
 
       setImage(null);
 
     } catch (error) {
-      setMessages(prev => [...prev, { role: 'bot', content: 'Network a buai, vawi khat han try leh teh' }]);
+      const errorMsg = 'Network a buai, vawi khat han try leh teh';
+      setMessages(prev => [...prev, { role: 'bot', content: errorMsg }]);
+      speak(errorMsg);
     }
 
     setLoading(false);
@@ -123,7 +197,7 @@ export default function Home() {
       <div style={{ maxWidth: '600px', margin: '0 auto', height: '60vh', overflowY: 'auto', padding: '10px', marginBottom: '20px' }}>
         {messages.length === 0 && (
           <div style={{ textAlign: 'center', color: '#9ca3af', marginTop: '50px' }}>
-            ZOGPT ka ni e. Thu min zawt la, thlalak pawh min thawn rawh. "Thlalak siam rawh" ti la ka siam sak ang che.
+            ZOGPT ka ni e. Mic hmet la, min be rawh. "Thlalak siam rawh" ti la ka siam sak ang che.
           </div>
         )}
         {messages.map((msg, i) => (
@@ -139,12 +213,16 @@ export default function Home() {
             {msg.hasImage && <div style={{fontSize: '12px', opacity: 0.7}}>📷 Thlalak nen</div>}
             {msg.content}
             {msg.image && <img src={msg.image} alt="ZOGPT siam" style={{ width: '100%', borderRadius: '8px', marginTop: '10px' }} />}
+            {msg.role === 'bot' && (
+              <button onClick={() => speak(msg.content)} style={{fontSize: '12px', marginTop: '5px', background: 'none', border: 'none', color: '#fbbf24', cursor: 'pointer'}}>
+                🔊 Play leh
+              </button>
+            )}
           </div>
         ))}
         {loading && <div style={{ background: '#374151', padding: '10px 15px', borderRadius: '10px', width: 'fit-content' }}>Ngaihtuah mek...</div>}
       </div>
 
-      {/* Camera UI */}
       {showCamera && (
         <div style={{ maxWidth: '600px', margin: '0 auto 10px', textAlign: 'center' }}>
           <video ref={videoRef} autoPlay playsInline style={{ width: '100%', borderRadius: '10px' }} />
@@ -164,11 +242,22 @@ export default function Home() {
         <button onClick={startCamera} style={{ padding: '12px', borderRadius: '8px', border: 'none', background: '#1f2937', color: 'white', cursor: 'pointer' }}>
           📷
         </button>
+        <button
+          onClick={toggleListening}
+          style={{ padding: '12px', borderRadius: '8px', border: 'none', background: isListening? '#ef4444' : '#1f2937', color: 'white', cursor: 'pointer' }}
+        >
+          {isListening? '⏹️' : '🎤'}
+        </button>
+        {isSpeaking && (
+          <button onClick={stopSpeaking} style={{ padding: '12px', borderRadius: '8px', border: 'none', background: '#f59e0b', color: 'white', cursor: 'pointer' }}>
+            🔇
+          </button>
+        )}
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-          placeholder="ZOGPT hnenah engkim zawt rawh..."
+          placeholder={isListening? "Ngai thla mek..." : "ZOGPT hnenah engkim zawt rawh..."}
           disabled={loading}
           style={{ flex: 1, padding: '12px', borderRadius: '8px', border: 'none', background: '#1f2937', color: 'white' }}
         />
