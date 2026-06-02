@@ -66,7 +66,12 @@ export default function Home() {
 
     try {
       // THLALAK SIAM DUH EM? check phawt ang
-      const isImageGen = userMessage.toLowerCase().includes("siam rawh") || userMessage.toLowerCase().includes("draw") || userMessage.toLowerCase().includes("thlalak min") || userMessage.toLowerCase().includes("pe rawh");
+      const isImageGen = userMessage.toLowerCase().includes("siam rawh") ||
+                         userMessage.toLowerCase().includes("draw") ||
+                         userMessage.toLowerCase().includes("thlalak min") ||
+                         userMessage.toLowerCase().includes("pe rawh") ||
+                         userMessage.toLowerCase().includes("han siam") ||
+                         userMessage.toLowerCase().includes("siam teh");
 
       let response;
       if (isImageGen &&!image) {
