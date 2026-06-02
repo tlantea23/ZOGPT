@@ -1,7 +1,4 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 export async function POST(req) {
   try {
@@ -11,33 +8,31 @@ export async function POST(req) {
       return NextResponse.json({ error: "Prompt a awm lo" }, { status: 400 });
     }
 
-    // He model hi thlalak siam thei tak tak a ni
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.0-flash-preview-image-generation"
+    // Google Imagen 3 API call
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${process.env.GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        instances: [{ prompt: `high quality, 4k, detailed photo of: ${prompt}` }],
+        parameters: { sampleCount: 1 }
+      })
     });
 
-    const result = await model.generateContent({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: {
-        responseModalities: ["TEXT", "IMAGE"]
-      },
-    });
+    const data = await response.json();
 
-    const response = result.response;
-    const imagePart = response.candidates[0].content.parts.find(part => part.inlineData);
-
-    if (!imagePart) {
-      return NextResponse.json({ error: "Thlalak ka siam thei lo. A dang han try teh" }, { status: 500 });
+    if (!response.ok ||!data.predictions ||!data.predictions[0].bytesBase64Encoded) {
+      console.error("Imagen API Error:", data);
+      return NextResponse.json({ error: "Thlalak ka siam thei lo. Prompt dang han try teh." }, { status: 500 });
     }
 
-    const base64Image = `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
+    const base64Image = `data:image/png;base64,${data.predictions[0].bytesBase64Encoded}`;
 
     return NextResponse.json({ image: base64Image });
 
   } catch (error) {
     console.error("Image Gen Error:", error);
     return NextResponse.json({
-      error: "Ka tihpalh, thlalak siamna ah ka buai. Model a la support lo a niang. Vawi khat han try leh teh."
+      error: "Ka tihpalh, thlalak siamna ah ka buai. Vawi khat han try leh teh."
     }, { status: 500 });
   }
 }
