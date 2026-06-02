@@ -4,6 +4,7 @@ import { signIn, signOut, useSession } from "next-auth/react";
 
 export default function Home() {
   const { data: session, status } = useSession();
+  const [mode, setMode] = useState("chat"); // chat | translate
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -11,9 +12,23 @@ export default function Home() {
   const [showCamera, setShowCamera] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+
+  // Translation states
+  const [fromLang, setFromLang] = useState("mizo");
+  const [toLang, setToLang] = useState("english");
+  const [translateInput, setTranslateInput] = useState("");
+  const [translateOutput, setTranslateOutput] = useState("");
+  const [translating, setTranslating] = useState(false);
+
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const recognitionRef = useRef(null);
+
+  const languages = [
+    { code: "mizo", name: "Mizo" },
+    { code: "english", name: "English" },
+    { code: "hindi", name: "Hindi" },
+  ];
 
   useEffect(() => {
     if (typeof window!== 'undefined') {
@@ -35,6 +50,16 @@ export default function Home() {
       }
     }
   }, []);
+
+  // Auto translate
+  useEffect(() => {
+    if (translateInput.trim() && mode === "translate") {
+      const timer = setTimeout(() => handleTranslate(), 800);
+      return () => clearTimeout(timer);
+    } else {
+      setTranslateOutput("");
+    }
+  }, [translateInput, fromLang, toLang, mode]);
 
   const toggleListening = () => {
     if (!recognitionRef.current) {
@@ -107,6 +132,34 @@ export default function Home() {
       videoRef.current.srcObject.getTracks().forEach(track => track.stop());
     }
     setShowCamera(false);
+  };
+
+  const handleTranslate = async (text = translateInput) => {
+    if (!text.trim()) return;
+    setTranslating(true);
+
+    const prompt = `Translate from ${fromLang} to ${toLang}. Only give the translation, no explanation: ${text}`;
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: prompt }),
+      });
+
+      const data = await res.json();
+      setTranslateOutput(data.reply || data.error);
+    } catch (err) {
+      setTranslateOutput("Translation failed");
+    }
+    setTranslating(false);
+  };
+
+  const swapLanguages = () => {
+    setFromLang(toLang);
+    setToLang(fromLang);
+    setTranslateInput(translateOutput);
+    setTranslateOutput(translateInput);
   };
 
   const sendMessage = async () => {
@@ -197,7 +250,7 @@ export default function Home() {
         <h1 style={{ fontSize: '3rem', fontWeight: 'bold', marginBottom: '2rem', color: '#fbbf24' }}>
           ZOGPT
         </h1>
-        <button 
+        <button
           onClick={() => signIn('google')}
           style={{
             backgroundColor: '#2563eb',
@@ -215,7 +268,7 @@ export default function Home() {
     )
   }
 
-  // LOGIN A NIH CHUAN I CHAT APP KHA
+  // LOGIN A NIH CHUAN
   return (
     <>
       <style jsx>{`
@@ -224,7 +277,7 @@ export default function Home() {
           70% { box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); }
           100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
         }
-      .mic-btn {
+       .mic-btn {
           width: 48px;
           height: 48px;
           border-radius: 50%;
@@ -237,22 +290,40 @@ export default function Home() {
           background: #1f2937;
           color: white;
         }
-      .mic-btn:hover {
+       .mic-btn:hover {
           background: #374151;
         }
-      .mic-btn.listening {
+       .mic-btn.listening {
           background: #ef4444;
           animation: pulse 1.5s infinite;
         }
-      .mic-icon {
+       .mic-icon {
           width: 20px;
           height: 20px;
+        }
+       .tab-btn {
+          padding: 8px 16px;
+          border-radius: 6px;
+          border: none;
+          cursor: pointer;
+          background: #1f2937;
+          color: white;
+        }
+       .tab-btn.active {
+          background: #2563eb;
         }
       `}</style>
 
       <main style={{ background: '#0f172a', color: 'white', minHeight: '100vh', padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-        <div style={{ maxWidth: '600px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <h1 style={{ color: '#fbbf24', margin: 0 }}>ZOGPT</h1>
+        {/* Header with Tabs */}
+        <div style={{ maxWidth: '600px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+            <h1 style={{ color: '#fbbf24', margin: 0 }}>ZOGPT</h1>
+            <div style={{ display: 'flex', gap: '5px', background: '#1f2937', padding: '4px', borderRadius: '8px' }}>
+              <button onClick={() => setMode("chat")} className={`tab-btn ${mode === "chat"? 'active' : ''}`}>Chat</button>
+              <button onClick={() => setMode("translate")} className={`tab-btn ${mode === "translate"? 'active' : ''}`}>Translate</button>
+            </div>
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <img src={session.user?.image || ''} alt="Profile" style={{ width: '32px', height: '32px', borderRadius: '50%' }} />
             <button onClick={() => signOut()} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: '#dc2626', color: 'white', cursor: 'pointer', fontSize: '12px' }}>
@@ -261,83 +332,146 @@ export default function Home() {
           </div>
         </div>
 
-        <div style={{ maxWidth: '600px', margin: '0 auto', height: '60vh', overflowY: 'auto', padding: '10px', marginBottom: '20px' }}>
-          {messages.length === 0 && (
-            <div style={{ textAlign: 'center', color: '#9ca3af', marginTop: '50px' }}>
-              ZOGPT ka ni e {session.user?.name}. Mic hmet la, min be rawh.
+        {mode === "chat"? (
+          <>
+            {/* CHAT MODE - I CODE HLUI */}
+            <div style={{ maxWidth: '600px', margin: '0 auto', height: '60vh', overflowY: 'auto', padding: '10px', marginBottom: '20px' }}>
+              {messages.length === 0 && (
+                <div style={{ textAlign: 'center', color: '#9ca3af', marginTop: '50px' }}>
+                  ZOGPT ka ni e {session.user?.name}. Mic hmet la, min be rawh.
+                </div>
+              )}
+              {messages.map((msg, i) => (
+                <div key={i} style={{
+                  background: msg.role === 'user'? '#2563eb' : '#374151',
+                  padding: '10px 15px',
+                  borderRadius: '10px',
+                  margin: msg.role === 'user'? '10px 0 10px auto' : '10px auto 10px 0',
+                  width: 'fit-content',
+                  maxWidth: '80%',
+                  wordWrap: 'break-word'
+                }}>
+                  {msg.hasImage && <div style={{fontSize: '12px', opacity: 0.7}}>📷 Thlalak nen</div>}
+                  {msg.content}
+                  {msg.image && <img src={msg.image} alt="ZOGPT siam" style={{ width: '100%', borderRadius: '8px', marginTop: '10px' }} />}
+                  {msg.role === 'bot' && (
+                    <button onClick={() => speak(msg.content)} style={{fontSize: '12px', marginTop: '5px', background: 'none', border: 'none', color: '#fbbf24', cursor: 'pointer'}}>
+                      🔊 Play leh
+                    </button>
+                  )}
+                </div>
+              ))}
+              {loading && <div style={{ background: '#374151', padding: '10px 15px', borderRadius: '10px', width: 'fit-content' }}>Ngaihtuah mek...</div>}
             </div>
-          )}
-          {messages.map((msg, i) => (
-            <div key={i} style={{
-              background: msg.role === 'user'? '#2563eb' : '#374151',
-              padding: '10px 15px',
-              borderRadius: '10px',
-              margin: msg.role === 'user'? '10px 0 10px auto' : '10px auto 10px 0',
-              width: 'fit-content',
-              maxWidth: '80%',
-              wordWrap: 'break-word'
-            }}>
-              {msg.hasImage && <div style={{fontSize: '12px', opacity: 0.7}}>📷 Thlalak nen</div>}
-              {msg.content}
-              {msg.image && <img src={msg.image} alt="ZOGPT siam" style={{ width: '100%', borderRadius: '8px', marginTop: '10px' }} />}
-              {msg.role === 'bot' && (
-                <button onClick={() => speak(msg.content)} style={{fontSize: '12px', marginTop: '5px', background: 'none', border: 'none', color: '#fbbf24', cursor: 'pointer'}}>
-                  🔊 Play leh
+
+            {showCamera && (
+              <div style={{ maxWidth: '600px', margin: '0 auto 10px', textAlign: 'center' }}>
+                <video ref={videoRef} autoPlay playsInline style={{ width: '100%', borderRadius: '10px' }} />
+                <canvas ref={canvasRef} style={{ display: 'none' }} />
+                <div style={{ marginTop: '10px', display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                  <button onClick={capturePhoto} style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', background: '#ef4444', color: 'white', cursor: 'pointer' }}>Thla La</button>
+                  <button onClick={stopCamera} style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', background: '#4b5563', color: 'white', cursor: 'pointer' }}>Cancel</button>
+                </div>
+              </div>
+            )}
+
+            <div style={{ maxWidth: '600px', margin: '0 auto', display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <label style={{ padding: '12px', borderRadius: '8px', background: '#1f2937', cursor: 'pointer' }}>
+                📁
+                <input type="file" accept="image/*" onChange={handleImage} style={{ display: 'none' }} />
+              </label>
+              <button onClick={startCamera} style={{ padding: '12px', borderRadius: '8px', border: 'none', background: '#1f2937', color: 'white', cursor: 'pointer' }}>
+                📷
+              </button>
+
+              <button onClick={toggleListening} className={`mic-btn ${isListening? 'listening' : ''}`}>
+                <svg className="mic-icon" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 0-.9.36-.98.85C16.52 14.2 14.47 16 12 16s-4.52-1.8-4.93-4.15c-.08-.49-.49-.85-.98-.85-.61 0-1.09.54-1 1.14.49 3 2.89 5.35 5.91 5.78V20c0.55.45 1 1 1s1-.45 1-1v-2.08c3.02-.43 5.42-2.78 5.91-5.78.1-.6-.39-1.14-1-1.14z"/>
+                </svg>
+              </button>
+
+              {isSpeaking && (
+                <button onClick={stopSpeaking} style={{ width: '48px', height: '48px', borderRadius: '50%', border: 'none', background: '#f59e0b', color: 'white', cursor: 'pointer' }}>
+                  🔇
                 </button>
               )}
+              <input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+                placeholder={isListening? "Ngai thla mek..." : "ZOGPT hnenah engkim zawt rawh..."}
+                disabled={loading}
+                style={{ flex: 1, padding: '12px', borderRadius: '24px', border: 'none', background: '#1f2937', color: 'white' }}
+              />
+              <button
+                onClick={sendMessage}
+                disabled={loading}
+                style={{ width: '48px', height: '48px', borderRadius: '50%', border: 'none', background: loading? '#4b5563' : '#2563eb', color: 'white', cursor: loading? 'not-allowed' : 'pointer' }}
+              >
+                ↑
+              </button>
             </div>
-          ))}
-          {loading && <div style={{ background: '#374151', padding: '10px 15px', borderRadius: '10px', width: 'fit-content' }}>Ngaihtuah mek...</div>}
-        </div>
+            {image &&!showCamera && <div style={{textAlign: 'center', color: '#fbbf24', fontSize: '12px', marginTop: '5px'}}>Thlalak thlan fel. Send hmet rawh.</div>}
+          </>
+        ) : (
+          <>
+            {/* TRANSLATE MODE - GOOGLE STYLE */}
+            <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+              {/* Language Selector */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '20px' }}>
+                <select
+                  value={fromLang}
+                  onChange={(e) => setFromLang(e.target.value)}
+                  style={{ background: '#1f2937', color: 'white', padding: '10px 15px', borderRadius: '8px', border: 'none', outline: 'none' }}>
+                  {languages.map((l) => (
+                    <option key={l.code} value={l.code}>{l.name}</option>
+                  ))}
+                </select>
 
-        {showCamera && (
-          <div style={{ maxWidth: '600px', margin: '0 auto 10px', textAlign: 'center' }}>
-            <video ref={videoRef} autoPlay playsInline style={{ width: '100%', borderRadius: '10px' }} />
-            <canvas ref={canvasRef} style={{ display: 'none' }} />
-            <div style={{ marginTop: '10px', display: 'flex', gap: '10px', justifyContent: 'center' }}>
-              <button onClick={capturePhoto} style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', background: '#ef4444', color: 'white', cursor: 'pointer' }}>Thla La</button>
-              <button onClick={stopCamera} style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', background: '#4b5563', color: 'white', cursor: 'pointer' }}>Cancel</button>
+                <button onClick={swapLanguages} style={{ background: '#374151', padding: '10px', borderRadius: '50%', border: 'none', color: 'white', cursor: 'pointer', fontSize: '18px' }}>
+                  ⇄
+                </button>
+
+                <select
+                  value={toLang}
+                  onChange={(e) => setToLang(e.target.value)}
+                  style={{ background: '#1f2937', color: 'white', padding: '10px 15px', borderRadius: '8px', border: 'none', outline: 'none' }}>
+                  {languages.map((l) => (
+                    <option key={l.code} value={l.code}>{l.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Translate Boxes */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', height: '50vh' }}>
+                <div style={{ background: '#1f2937', borderRadius: '10px', padding: '15px', display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '10px' }}>{languages.find(l => l.code === fromLang)?.name}</div>
+                  <textarea
+                    value={translateInput}
+                    onChange={(e) => setTranslateInput(e.target.value)}
+                    placeholder="Text ziak rawh..."
+                    style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: 'white', fontSize: '16px', resize: 'none' }}
+                  />
+                  <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '10px' }}>{translateInput.length} / 5000</div>
+                </div>
+
+                <div style={{ background: '#1f2937', borderRadius: '10px', padding: '15px', display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '10px' }}>{languages.find(l => l.code === toLang)?.name}</div>
+                  <div style={{ flex: 1, fontSize: '16px', color: translateOutput? 'white' : '#6b7280' }}>
+                    {translating? 'Translating...' : translateOutput || 'Translation'}
+                  </div>
+                  {translateOutput && (
+                    <button
+                      onClick={() => navigator.clipboard.writeText(translateOutput)}
+                      style={{ fontSize: '12px', background: '#374151', padding: '6px 12px', borderRadius: '6px', border: 'none', color: 'white', cursor: 'pointer', width: 'fit-content' }}>
+                      📋 Copy
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
-          </div>
+          </>
         )}
-
-        <div style={{ maxWidth: '600px', margin: '0 auto', display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <label style={{ padding: '12px', borderRadius: '8px', background: '#1f2937', cursor: 'pointer' }}>
-            📁
-            <input type="file" accept="image/*" onChange={handleImage} style={{ display: 'none' }} />
-          </label>
-          <button onClick={startCamera} style={{ padding: '12px', borderRadius: '8px', border: 'none', background: '#1f2937', color: 'white', cursor: 'pointer' }}>
-            📷
-          </button>
-
-          <button onClick={toggleListening} className={`mic-btn ${isListening? 'listening' : ''}`}>
-            <svg className="mic-icon" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 0-.9.36-.98.85C16.52 14.2 14.47 16 12 16s-4.52-1.8-4.93-4.15c-.08-.49-.49-.85-.98-.85-.61 0-1.09.54-1 1.14.49 3 2.89 5.35 5.91 5.78V20c0.55.45 1 1 1s1-.45 1-1v-2.08c3.02-.43 5.42-2.78 5.91-5.78.1-.6-.39-1.14-1-1.14z"/>
-            </svg>
-          </button>
-
-          {isSpeaking && (
-            <button onClick={stopSpeaking} style={{ width: '48px', height: '48px', borderRadius: '50%', border: 'none', background: '#f59e0b', color: 'white', cursor: 'pointer' }}>
-              🔇
-            </button>
-          )}
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-            placeholder={isListening? "Ngai thla mek..." : "ZOGPT hnenah engkim zawt rawh..."}
-            disabled={loading}
-            style={{ flex: 1, padding: '12px', borderRadius: '24px', border: 'none', background: '#1f2937', color: 'white' }}
-          />
-          <button
-            onClick={sendMessage}
-            disabled={loading}
-            style={{ width: '48px', height: '48px', borderRadius: '50%', border: 'none', background: loading? '#4b5563' : '#2563eb', color: 'white', cursor: loading? 'not-allowed' : 'pointer' }}
-          >
-            ↑
-          </button>
-        </div>
-        {image &&!showCamera && <div style={{textAlign: 'center', color: '#fbbf24', fontSize: '12px', marginTop: '5px'}}>Thlalak thlan fel. Send hmet rawh.</div>}
       </main>
     </>
   );
