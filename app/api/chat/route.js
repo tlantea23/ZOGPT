@@ -5,16 +5,27 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 export async function POST(req) {
   try {
-    const { messages } = await req.json();
+    const body = await req.json();
+    
+    // Frontend atangin 'message' emaw 'messages' a lo kal thei ve ve
+    const userMessage = body.message || body.messages?.[body.messages.length - 1]?.content;
+    const history = body.messages || [];
 
-    // Model hming dik tak: gemini-2.5-flash
+    if (!userMessage) {
+      return NextResponse.json(
+        { error: "Message a awm lo" },
+        { status: 400 }
+      );
+    }
+
     const model = genAI.getGenerativeModel({ 
       model: "gemini-2.5-flash",
       systemInstruction: "I hming chu ZOGPT i ni. Mizo tawngin chhang zel ang che. I tawngkam a polite in a fel fai tur a ni."
     });
 
+    // History a awm chuan hmang la, a awm loh chuan message thar chauh hmang rawh
     const chat = model.startChat({
-      history: messages.slice(0, -1).map(msg => ({
+      history: history.slice(0, -1).map(msg => ({
         role: msg.role === 'user' ? 'user' : 'model',
         parts: [{ text: msg.content }],
       })),
@@ -24,8 +35,7 @@ export async function POST(req) {
       },
     });
 
-    const lastMessage = messages[messages.length - 1].content;
-    const result = await chat.sendMessage(lastMessage);
+    const result = await chat.sendMessage(userMessage);
     const response = result.response;
     const text = response.text();
 
