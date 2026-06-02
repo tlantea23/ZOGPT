@@ -1,52 +1,41 @@
-import { NextResponse } from 'next/server';
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { NextResponse } from "next/server";
 
-export async function POST(request) {
-  const { message } = await request.json();
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-  if (!message) {
-    return NextResponse.json({ error: 'Message a awm lo' }, { status: 400 });
-  }
-
+export async function POST(req) {
   try {
-    // Gemini 1.5 Flash - A stable ber, 3.5 aiin
-    const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${process.env.GEMINI_API_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [{ text: message }]
-        }],
-        systemInstruction: {
-          parts: [{
-            text: 'I hming chu ZOGPT a ni. Mizo AI fel tak i ni. Vawiin ni chu June 1, 2026 a ni. Mizoram Chief Minister tunah hian Pu Lalduhoma a ni a, ZPM party hruaitu a ni. Mizoram Governor tunah hian General VK Singh a ni. Mizo tawngin tawi fel fai takin chhang zel ang che. I hriat loh chu "Ka hre lo" ti mai rawh.'
-          }]
-        },
-        generationConfig: {
-          temperature: 0.4,
-          maxOutputTokens: 800
-        }
-      })
+    const { messages } = await req.json();
+
+    // Model hming dik tak: gemini-2.5-flash
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-2.5-flash",
+      systemInstruction: "I hming chu ZOGPT i ni. Mizo tawngin chhang zel ang che. I tawngkam a polite in a fel fai tur a ni."
     });
 
-    if (!geminiRes.ok) {
-      const errorData = await geminiRes.json();
-      console.error('Gemini API Error:', JSON.stringify(errorData));
-      // Error message chiang zawk
-      const errorMsg = errorData.error?.message || 'Gemini API a buai';
-      return NextResponse.json({ error: `API Error: ${errorMsg}` }, { status: 500 });
-    }
+    const chat = model.startChat({
+      history: messages.slice(0, -1).map(msg => ({
+        role: msg.role === 'user' ? 'user' : 'model',
+        parts: [{ text: msg.content }],
+      })),
+      generationConfig: {
+        maxOutputTokens: 2048,
+        temperature: 0.9,
+      },
+    });
 
-    const data = await geminiRes.json();
+    const lastMessage = messages[messages.length - 1].content;
+    const result = await chat.sendMessage(lastMessage);
+    const response = result.response;
+    const text = response.text();
 
-    if (!data.candidates ||!data.candidates[0]) {
-      return NextResponse.json({ error: 'Gemini in chhanna a rawn pe lo' }, { status: 500 });
-    }
-
-    const reply = data.candidates[0].content.parts[0].text;
-    return NextResponse.json({ reply });
+    return NextResponse.json({ text });
 
   } catch (error) {
-    console.error('Catch Error:', error);
-    return NextResponse.json({ error: `Server buai: ${error.message}` }, { status: 500 });
+    console.error("Gemini API Error:", error);
+    return NextResponse.json(
+      { error: "API Error: " + error.message },
+      { status: 500 }
+    );
   }
 }
