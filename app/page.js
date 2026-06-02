@@ -1,21 +1,58 @@
 'use client';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 
 export default function Home() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [image, setImage] = useState(null);
+  const [showCamera, setShowCamera] = useState(false);
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
 
+  // 1. File Upload
   const handleImage = (e) => {
     const file = e.target.files[0];
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
         setImage(reader.result.split(',')[1]);
+        setShowCamera(false);
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  // 2. Camera On
+  const startCamera = async () => {
+    setShowCamera(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      if (videoRef.current) videoRef.current.srcObject = stream;
+    } catch (err) {
+      alert("Camera i phal lo nge? Settings ah en rawh");
+      setShowCamera(false);
+    }
+  };
+
+  // 3. Thla la
+  const capturePhoto = () => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    const dataUrl = canvas.toDataURL('image/jpeg');
+    setImage(dataUrl.split(',')[1]);
+    stopCamera();
+  };
+
+  // 4. Camera Off
+  const stopCamera = () => {
+    if (videoRef.current?.srcObject) {
+      videoRef.current.srcObject.getTracks().forEach(track => track.stop());
+    }
+    setShowCamera(false);
   };
 
   const sendMessage = async () => {
@@ -25,6 +62,7 @@ export default function Home() {
     setMessages(prev => [...prev, { role: 'user', content: userMessage, hasImage:!!image }]);
     setInput('');
     setLoading(true);
+    stopCamera();
 
     try {
       const response = await fetch('/api/chat', {
@@ -48,7 +86,7 @@ export default function Home() {
     <main style={{ background: '#0f172a', color: 'white', minHeight: '100vh', padding: '20px', fontFamily: 'Arial, sans-serif' }}>
       <h1 style={{ textAlign: 'center', color: '#fbbf24', marginBottom: '20px' }}>ZOGPT</h1>
 
-      <div style={{ maxWidth: '600px', margin: '0 auto', height: '70vh', overflowY: 'auto', padding: '10px', marginBottom: '20px' }}>
+      <div style={{ maxWidth: '600px', margin: '0 auto', height: '60vh', overflowY: 'auto', padding: '10px', marginBottom: '20px' }}>
         {messages.length === 0 && (
           <div style={{ textAlign: 'center', color: '#9ca3af', marginTop: '50px' }}>
             ZOGPT ka ni e. Thu min zawt la, thlalak pawh min thawn rawh.
@@ -71,11 +109,26 @@ export default function Home() {
         {loading && <div style={{ background: '#374151', padding: '10px 15px', borderRadius: '10px', width: 'fit-content' }}>Ngaihtuah mek...</div>}
       </div>
 
+      {/* Camera UI */}
+      {showCamera && (
+        <div style={{ maxWidth: '600px', margin: '0 auto 10px', textAlign: 'center' }}>
+          <video ref={videoRef} autoPlay playsInline style={{ width: '100%', borderRadius: '10px' }} />
+          <canvas ref={canvasRef} style={{ display: 'none' }} />
+          <div style={{ marginTop: '10px', display: 'flex', gap: '10px', justifyContent: 'center' }}>
+            <button onClick={capturePhoto} style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', background: '#ef4444', color: 'white' }}>Thla La</button>
+            <button onClick={stopCamera} style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', background: '#4b5563', color: 'white' }}>Cancel</button>
+          </div>
+        </div>
+      )}
+
       <div style={{ maxWidth: '600px', margin: '0 auto', display: 'flex', gap: '10px', alignItems: 'center' }}>
         <label style={{ padding: '12px', borderRadius: '8px', background: '#1f2937', cursor: 'pointer' }}>
-          📷
+          📁
           <input type="file" accept="image/*" onChange={handleImage} style={{ display: 'none' }} />
         </label>
+        <button onClick={startCamera} style={{ padding: '12px', borderRadius: '8px', border: 'none', background: '#1f2937', color: 'white', cursor: 'pointer' }}>
+          📷
+        </button>
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -92,7 +145,7 @@ export default function Home() {
           Send
         </button>
       </div>
-      {image && <div style={{textAlign: 'center', color: '#fbbf24', fontSize: '12px', marginTop: '5px'}}>Thlalak thlan fel. Send hmet rawh.</div>}
+      {image &&!showCamera && <div style={{textAlign: 'center', color: '#fbbf24', fontSize: '12px', marginTop: '5px'}}>Thlalak thlan fel. Send hmet rawh.</div>}
     </main>
   );
 }
